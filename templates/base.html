@@ -13,21 +13,31 @@
 <body>
 
     <!-- ✅ Navigation Bar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-4">
-        <a class="navbar-brand" href="/">NewsGenie AI</a>
-        <div class="ms-auto">
+    <!-- ✅ Full-width dark navbar -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark w-100">
+    <div class="container-fluid px-4 d-flex justify-content-between align-items-center">
+        <!-- Brand -->
+        <a class="navbar-brand fw-bold text-primary" href="/">NewsGenie AI</a>
+
+        <!-- Right-side Buttons -->
+        <div>
             {% if user.is_authenticated %}
-            
+            <form method="post" action="{% url 'logout' %}" style="display: inline;">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-primary btn-sm">Logout</button>
+</form>
+
+</form>
+                
             {% else %}
-                <a class="btn btn-outline-light me-2" href="{% url 'login' %}">Login</a>
-                <a class="btn btn-outline-light" href="{% url 'register' %}">Register</a>
+                <a class="btn btn-outline-light btn-sm me-2" href="{% url 'login' %}">Login</a>
+                <a class="btn btn-outline-light btn-sm" href="{% url 'register' %}">Register</a>
             {% endif %}
         </div>
-    </nav>
-    <form method="post" action="{% url 'logout' %}">
-  {% csrf_token %}
-  <button type="submit">Logout</button>
-</form>
+    </div>
+</nav>
+
+
 
     <div class="container mt-4">
         {% if messages %}

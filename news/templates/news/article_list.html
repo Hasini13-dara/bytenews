@@ -1,69 +1,91 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<div class="container mt-4">
+
   <h2 class="mb-4 text-center">📰 Latest Articles</h2>
 
-  <!-- ✅ Category Filter Buttons -->
-  <div class="mb-4 text-center">
-    <a href="{% url 'home' %}" class="btn btn-outline-primary {% if not current_category %}active{% endif %}">All</a>
-    {% for cat in categories %}
-      <a href="?category={{ cat }}" class="btn btn-outline-primary {% if current_category == cat %}active{% endif %}">
-        {{ cat }}
-      </a>
-    {% endfor %}
+  <!-- ✅ Filter Section: Search Bar + Categories -->
+  <div class="mb-4">
+    <div class="row justify-content-center">
+      <!-- Search Form -->
+      <div class="col-md-8">
+        <form method="get" action="{% url 'home' %}" class="d-flex align-items-center mb-3">
+          <input type="text" name="q" value="{{ query }}" placeholder="Search articles..." class="form-control me-2" />
+          <button type="submit" class="btn btn-outline-secondary">Search</button>
+        </form>
+      </div>
+
+      <!-- Category Navigation -->
+      <div class="col-md-12 text-center">
+        <div class="btn-group flex-wrap" role="group">
+          <a href="{% url 'home' %}" class="btn {% if not current_category %}btn-primary{% else %}btn-outline-primary{% endif %} mb-2 me-2">
+            All Articles
+          </a>
+          {% for category in categories %}
+            <a href="{% url 'home' %}?category={{ category.name }}" 
+               class="btn {% if current_category == category.name %}btn-primary{% else %}btn-outline-primary{% endif %} mb-2 me-2">
+              {{ category.name }} ({{ category.article_count }})
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
   </div>
 
+  <!-- ✅ Articles List -->
   <div class="row">
     {% for article in articles %}
       <div class="col-md-6 mb-4">
         <div class="card h-100 shadow-sm">
           <div class="card-body">
             <h5 class="card-title">{{ article.title }}</h5>
-            <p class="card-text">{{ article.content|truncatewords:30 }}</p>
-            <a href="{% url 'article_detail' article.pk %}" class="btn btn-sm btn-outline-secondary mt-2">Read More</a>
-          </div>
-          <div class="card-footer text-muted text-end">
-            Published on {{ article.published_at|date:"F j, Y, g:i a" }}
+            <p class="card-text">{{ article.summary|default:"No summary available." }}</p>
+            <a href="{% url 'article_detail' article.pk %}" class="btn btn-primary">Read More</a>
           </div>
         </div>
       </div>
     {% empty %}
-      <div class="col-12">
-        <div class="alert alert-warning text-center">No articles found.</div>
+      <div class="col-12 text-center">
+        <p class="text-muted">No articles found.</p>
       </div>
     {% endfor %}
   </div>
 
-  <!-- ✅ Pagination Controls -->
+  <!-- ✅ Pagination -->
   {% if is_paginated %}
-    <nav aria-label="Page navigation" class="d-flex justify-content-center mt-4">
-      <ul class="pagination">
-        {% if page_obj.has_previous %}
-          <li class="page-item">
-            <a class="page-link" href="?{% if current_category %}category={{ current_category }}&{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
-          </li>
-        {% else %}
-          <li class="page-item disabled"><span class="page-link">Previous</span></li>
-        {% endif %}
-
-        {% for num in page_obj.paginator.page_range %}
-          {% if page_obj.number == num %}
-            <li class="page-item active"><span class="page-link">{{ num }}</span></li>
-          {% else %}
+    <div class="d-flex justify-content-center mt-4">
+      <nav>
+        <ul class="pagination">
+          {% if page_obj.has_previous %}
             <li class="page-item">
-              <a class="page-link" href="?{% if current_category %}category={{ current_category }}&{% endif %}page={{ num }}">{{ num }}</a>
+              <a class="page-link" href="?{% if current_category %}category={{ current_category }}&{% endif %}{% if query %}q={{ query }}&{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
             </li>
+          {% else %}
+            <li class="page-item disabled"><span class="page-link">Previous</span></li>
           {% endif %}
-        {% endfor %}
 
-        {% if page_obj.has_next %}
-          <li class="page-item">
-            <a class="page-link" href="?{% if current_category %}category={{ current_category }}&{% endif %}page={{ page_obj.next_page_number }}">Next</a>
-          </li>
-        {% else %}
-          <li class="page-item disabled"><span class="page-link">Next</span></li>
-        {% endif %}
-      </ul>
-    </nav>
+          {% for num in paginator.page_range %}
+            {% if page_obj.number == num %}
+              <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+              <li class="page-item">
+                <a class="page-link" href="?{% if current_category %}category={{ current_category }}&{% endif %}{% if query %}q={{ query }}&{% endif %}page={{ num }}">{{ num }}</a>
+              </li>
+            {% endif %}
+          {% endfor %}
+
+          {% if page_obj.has_next %}
+            <li class="page-item">
+              <a class="page-link" href="?{% if current_category %}category={{ current_category }}&{% endif %}{% if query %}q={{ query }}&{% endif %}page={{ page_obj.next_page_number }}">Next</a>
+            </li>
+          {% else %}
+            <li class="page-item disabled"><span class="page-link">Next</span></li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
   {% endif %}
+
+</div>
 {% endblock %}

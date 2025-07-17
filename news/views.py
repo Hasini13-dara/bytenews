@@ -1,29 +1,39 @@
 from django.views.generic import ListView, DetailView
-from .models import Article
+from django.db.models import Count, Q
+from .models import Article, Category
 
 class ArticleListView(ListView):
     model = Article
-    template_name = 'home.html'
+    template_name = 'news/article_list.html'
     context_object_name = 'articles'
-    paginate_by = 10
-    ordering = ['-published_date']  # Ensure this matches your model field
+    paginate_by = 6
 
     def get_queryset(self):
-        # Only return articles that have a non-null published_date
-        queryset = super().get_queryset().filter(published_date__isnull=False)
-
-        # Optional: Only show articles with category if category filter is used
+        queryset = Article.objects.all().order_by('-published_date')
         category = self.request.GET.get('category')
-        if category:
-            queryset = queryset.filter(category__id=category)
+        query = self.request.GET.get('q')
 
+        # If a category is selected via button/filter
+        if category:
+            queryset = queryset.filter(category__name=category)
+        
+        # If a search is performed via input box
+        if query:
+            queryset = queryset.filter(
+                Q(title__icontains=query) |
+                Q(content__icontains=query) |
+                Q(summary__icontains=query) |
+                Q(category__name__icontains=query)
+            ).distinct()  # Prevent duplicates if multiple conditions match
 
         return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['categories'] = Article.objects.values_list('category', flat=True).distinct()
+        categories = Category.objects.annotate(article_count=Count('article'))
+        context['categories'] = categories
         context['current_category'] = self.request.GET.get('category')
+        context['query'] = self.request.GET.get('q', '')
         return context
 
 class ArticleDetailView(DetailView):

@@ -9,6 +9,7 @@ from django.contrib import admin
 from django.contrib import admin
 from .models import Category, Article, UserPreference, ReadingHistory
 
+
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
     list_display = ['name', 'description']

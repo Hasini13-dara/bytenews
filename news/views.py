@@ -3,13 +3,12 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.db.models import Q, Count
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.views.decorators.http import require_POST
+from django.http import JsonResponse
+
 import logging
 
-from django.shortcuts import get_object_or_404, redirect
-from .models import Article
-from .utils import generate_summary
-
-from .models import Article, Category, UserPreference, ReadingHistory
+from .models import Article, Category, UserPreference, ReadingHistory, SummaryFeedback
 from .utils import generate_summary
 
 logger = logging.getLogger(__name__)
@@ -92,6 +91,21 @@ class ArticleDetailView(DetailView):
             ReadingHistory.objects.get_or_create(user=self.request.user, article=obj)
         return obj
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        article = self.object
+
+        context['helpful_count'] = SummaryFeedback.objects.filter(article=article, is_helpful=True).count()
+        context['not_helpful_count'] = SummaryFeedback.objects.filter(article=article, is_helpful=False).count()
+
+        if self.request.user.is_authenticated:
+            feedback = SummaryFeedback.objects.filter(user=self.request.user, article=article).first()
+            context['user_feedback'] = feedback.is_helpful if feedback else None
+        else:
+            context['user_feedback'] = None
+
+        return context
+
 
 class HomePageView(TemplateView):
     template_name = 'news/homepage.html'
@@ -109,8 +123,6 @@ def reading_history(request):
     return render(request, 'news/reading_history.html', {'history': history})
 
 
-# ✅ Task 5: Manual Summary Generation View
-@login_required
 @login_required
 def generate_summary_view(request, pk):
     article = get_object_or_404(Article, pk=pk)
@@ -121,17 +133,37 @@ def generate_summary_view(request, pk):
         except (TypeError, ValueError):
             num_sentences = 5
 
-        # ✅ Clamp to sensible range
         num_sentences = max(1, min(num_sentences, 10))
-
-        # ✅ Re-generate summary every time using updated function
         new_summary = generate_summary(article.content, article.title, num_sentences)
-
-        # ✅ Save the new summary
         article.summary = new_summary
         article.save()
 
-        # ✅ Add a success message
-        messages.success(request, f'Summary successfully generated with {num_sentences} sentence{"s" if num_sentences > 1 else ""}!')
+        messages.success(request, f'Summary successfully generated with {num_sentences} sentence{"s" if num_sentences > 1 else ""}.')
 
+    return redirect('article_detail', pk=pk)
+
+
+@login_required
+@require_POST
+def submit_summary_feedback(request, pk):
+    article = get_object_or_404(Article, pk=pk)
+    is_helpful = request.POST.get('is_helpful')
+
+    if is_helpful is not None:
+        is_helpful_bool = (is_helpful.lower() == 'true')
+
+        feedback, created = SummaryFeedback.objects.update_or_create(
+            user=request.user,
+            article=article,
+            defaults={'is_helpful': is_helpful_bool}
+        )
+
+        messages.success(request, 'Thank you for your feedback!')
+
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'success', 'helpful': is_helpful_bool})
+        else:
+            return redirect('article_detail', pk=pk)
+
+    messages.error(request, 'Invalid feedback provided.')
     return redirect('article_detail', pk=pk)

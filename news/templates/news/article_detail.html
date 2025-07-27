@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+
 {% block content %}
 <div class="container mt-4">
   <div class="card shadow-lg">
@@ -10,16 +11,42 @@
 
       {% if article.summary %}
         <div class="alert alert-primary">
-          <strong>Summary:</strong> {{ article.summary }}
+          <strong>Summary:</strong> {{ article.summary|linebreaksbr }}
         </div>
+
+        <div class="mt-2 text-muted">
+          <p>👍 Helpful: {{ helpful_count }} | 👎 Not Helpful: {{ not_helpful_count }}</p>
+        </div>
+
+        {% if user.is_authenticated %}
+          <div>
+            <small class="text-muted">Was this summary helpful?</small><br>
+           <form id="feedback-form" method="post" action="{% url 'submit_summary_feedback' article.id %}">
+  {% csrf_token %}
+  <input type="hidden" name="is_helpful" id="is-helpful-input" value="">
+
+  <p>Was this summary helpful?</p>
+  <button type="submit" class="btn btn-success" onclick="setFeedbackValue(true)">Yes</button>
+  <button type="submit" class="btn btn-danger" onclick="setFeedbackValue(false)">No</button>
+</form>
+            <div id="feedback-message" class="text-success mt-2" style="display: none;">Thank you for your feedback!</div>
+          </div>
+          <script>
+    function setFeedbackValue(value) {
+      document.getElementById("is-helpful-input").value = value;
+    }
+  </script>
+        {% else %}
+          <p class="text-muted mt-2">Login to provide feedback.</p>
+        {% endif %}
       {% endif %}
 
-      <p class="card-text mt-3">{{ article.content }}</p>
+      <p class="card-text mt-4">{{ article.content|linebreaksbr }}</p>
 
       {% if user.is_authenticated %}
         <form method="post" action="{% url 'generate_summary' article.pk %}">
           {% csrf_token %}
-          <label for="num_sentences" class="form-label mt-3">Summary Length (number of sentences):</label>
+          <label for="num_sentences" class="form-label mt-4">Summary Length (number of sentences):</label>
           <input type="number" name="num_sentences" id="num_sentences" min="1" max="10" value="5" class="form-control w-25 d-inline-block">
           <button class="btn btn-outline-info mt-2" type="submit">Generate Summary</button>
         </form>
@@ -37,4 +64,6 @@
     <a href="{% url 'home' %}" class="btn btn-secondary">← Back to All Articles</a>
   </div>
 </div>
+
+
 {% endblock %}

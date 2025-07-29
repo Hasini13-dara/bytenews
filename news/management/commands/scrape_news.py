@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from news.utils import fetch_news_from_rss, generate_summary
+from news.utils import fetch_news_from_rss, generate_summary, generate_audio_summary
 from news.models import Article, Category
 
 class Command(BaseCommand):
@@ -23,20 +23,33 @@ class Command(BaseCommand):
 
             for article_data in articles_data:
                 if not Article.objects.filter(link=article_data['link']).exists():
-                    # ✅ Generate summary from content
-                    article_summary = generate_summary(article_data['content'])
+                    title = article_data['title']
+                    content = article_data['content']
 
-                    # ✅ Create the article with the summary
-                    Article.objects.create(
-                        title=article_data['title'],
-                        content=article_data['content'],
+                    # ✅ Generate summary
+                    article_summary = generate_summary(content, title)
+
+                    # ✅ Step 1: Create article WITHOUT audio first
+                    article = Article.objects.create(
+                        title=title,
+                        content=content,
                         link=article_data['link'],
                         publication_date=article_data['publication_date'],
                         author=article_data.get('author', 'Unknown'),
                         source=article_data['source'],
                         category=default_category,
-                        summary=article_summary  # ✅ Save summary
+                        approved=False,
+                        summary=article_summary,
+                        audio_file=None  # placeholder
                     )
+
+                    # ✅ Step 2: Generate audio using article ID
+                    audio_url = generate_audio_summary(article_summary, article.id)
+
+                    # ✅ Step 3: Save audio_file URL
+                    article.audio_file = audio_url
+                    article.save()
+
                     articles_added += 1
 
         self.stdout.write(self.style.SUCCESS(f"Finished scraping. Added {articles_added} new articles."))

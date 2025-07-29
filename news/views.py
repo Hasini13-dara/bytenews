@@ -167,3 +167,11 @@ def submit_summary_feedback(request, pk):
 
     messages.error(request, 'Invalid feedback provided.')
     return redirect('article_detail', pk=pk)
+from .utils import text_to_speech
+
+def create_audio_for_article(article):
+    if article.content:
+        filename = f"article{article.id}.mp3"
+        relative_audio_path = text_to_speech(article.content, filename)
+        article.audio_file = relative_audio_path
+        article.save()

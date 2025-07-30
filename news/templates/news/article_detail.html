@@ -2,9 +2,7 @@
 {% load static %}
 {% get_media_prefix as MEDIA_URL %}
 
-
 {% block content %}
-
 <div class="container mt-4">
   <div class="card shadow-lg">
     <div class="card-body">
@@ -18,20 +16,38 @@
           <strong>Summary:</strong> {{ article.summary|linebreaksbr }}
         </div>
 
-        {% if article.audio_file %}
-          <div class="mt-3">
-            <h5>Audio Summary:</h5>
-            <audio controls preload="auto" style="width: 100%;">
-  <source src="{{ MEDIA_URL }}{{ article.audio_file }}" type="audio/mpeg">
-  Your browser does not support the audio element.
-</audio>
-
-
+        <!-- Audio Player Section -->
+        <div id="audioPlayerContainer" class="mt-3">
+          <h5>Audio Summary:</h5>
+          {% if article.audio_file %}
+            <audio id="audioPlayer" controls preload="auto" style="width: 100%;">
+              <source src="{{ article.audio_file.url }}" type="audio/mpeg">
+              Your browser does not support the audio element.
+            </audio>
             <p class="text-muted small mt-1">File: {{ article.audio_file.name }}</p>
-          </div>
-        {% else %}
-          <p class="text-muted"><em>No audio summary available.</em></p>
-        {% endif %}
+
+            {% if user.is_authenticated %}
+              <form id="audioForm">
+                {% csrf_token %}
+                <button id="generateAudioBtn" class="btn btn-warning mt-2" data-article-id="{{ article.id }}">
+                  🔄 Regenerate Audio Summary
+                </button>
+              </form>
+            {% endif %}
+          {% else %}
+            <p id="audioStatus" class="text-muted"><em>Audio summary not yet generated.</em></p>
+            {% if user.is_authenticated %}
+              <form id="audioForm">
+                {% csrf_token %}
+                <button id="generateAudioBtn" class="btn btn-primary mt-2" data-article-id="{{ article.id }}">
+                  🎤 Generate Audio Summary
+                </button>
+              </form>
+            {% else %}
+              <p class="text-muted">Login to generate audio summary.</p>
+            {% endif %}
+          {% endif %}
+        </div>
 
         <div class="mt-2 text-muted">
           <p>👍 Helpful: {{ helpful_count }} | 👎 Not Helpful: {{ not_helpful_count }}</p>
@@ -54,27 +70,28 @@
               document.getElementById("is-helpful-input").value = value;
             }
 
-            document.getElementById("feedback-form").addEventListener("submit", function (e) {
-              e.preventDefault();
+            document.addEventListener('DOMContentLoaded', function () {
+              document.getElementById("feedback-form").addEventListener("submit", function (e) {
+                e.preventDefault();
+                const form = e.target;
+                const formData = new FormData(form);
+                const csrfToken = formData.get("csrfmiddlewaretoken");
 
-              const form = e.target;
-              const formData = new FormData(form);
-              const csrfToken = formData.get("csrfmiddlewaretoken");
-
-              fetch(form.action, {
-                method: "POST",
-                headers: {
-                  'X-CSRFToken': csrfToken,
-                },
-                body: formData,
-              })
-              .then(response => {
-                if (response.ok) {
-                  document.getElementById("feedback-message").style.display = "block";
-                }
-              })
-              .catch(error => {
-                console.error("Error submitting feedback:", error);
+                fetch(form.action, {
+                  method: "POST",
+                  headers: {
+                    'X-CSRFToken': csrfToken,
+                  },
+                  body: formData,
+                })
+                .then(response => {
+                  if (response.ok) {
+                    document.getElementById("feedback-message").style.display = "block";
+                  }
+                })
+                .catch(error => {
+                  console.error("Error submitting feedback:", error);
+                });
               });
             });
           </script>
@@ -98,7 +115,7 @@
     </div>
 
     <div class="card-footer text-muted text-end">
-      Published on {{ article.published_at|date:"F j, Y, g:i a" }}
+      Published on {{ article.published_date|date:"F j, Y, g:i a" }}
     </div>
   </div>
 
@@ -106,4 +123,65 @@
     <a href="{% url 'home' %}" class="btn btn-secondary">← Back to All Articles</a>
   </div>
 </div>
+
+<!-- AJAX Audio Generation Script -->
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const generateAudioBtn = document.getElementById('generateAudioBtn');
+    const audioPlayerContainer = document.getElementById('audioPlayerContainer');
+    const csrfToken = document.querySelector('#audioForm input[name="csrfmiddlewaretoken"]')?.value;
+
+    if (generateAudioBtn && csrfToken) {
+      generateAudioBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        const articleId = this.dataset.articleId;
+
+        const loadingText = document.createElement('p');
+        loadingText.id = "audioStatus";
+        loadingText.className = "text-muted";
+        loadingText.innerHTML = "<em>Generating audio... Please wait.</em>";
+
+        audioPlayerContainer.appendChild(loadingText);
+        generateAudioBtn.disabled = true;
+
+        fetch(`/articles/article/${articleId}/generate_audio_ajax/`, {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': csrfToken,
+            'Content-Type': 'application/json'
+          },
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.status === 'success') {
+            loadingText.textContent = 'Audio summary ready!';
+
+            const newAudioPlayer = document.createElement('audio');
+            newAudioPlayer.id = 'audioPlayer';
+            newAudioPlayer.controls = true;
+            newAudioPlayer.style.width = '100%';
+
+            const source = document.createElement('source');
+            source.src = data.audio_url;
+            source.type = 'audio/mpeg';
+
+            newAudioPlayer.appendChild(source);
+            audioPlayerContainer.innerHTML = '';
+            audioPlayerContainer.appendChild(newAudioPlayer);
+            newAudioPlayer.load();
+            newAudioPlayer.play();
+          } else {
+            loadingText.textContent = `Error: ${data.message}`;
+            generateAudioBtn.disabled = false;
+          }
+        })
+        .catch(error => {
+          console.error('Fetch error:', error);
+          loadingText.textContent = 'Failed to generate audio. Please try again.';
+          generateAudioBtn.disabled = false;
+        });
+      });
+    }
+  });
+</script>
 {% endblock %}

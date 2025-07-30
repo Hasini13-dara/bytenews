@@ -1,15 +1,16 @@
+import logging
 from django.views.generic import ListView, DetailView, TemplateView
 from django.shortcuts import render, redirect, get_object_or_404
 from django.db.models import Q, Count
-from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
-
-import logging
+from django.conf import settings
+from django.views.decorators.csrf import csrf_exempt
 
 from .models import Article, Category, UserPreference, ReadingHistory, SummaryFeedback
-from .utils import generate_summary
+from .utils import generate_summary, generate_audio_summary, text_to_speech, generate_audio_from_text
 
 logger = logging.getLogger(__name__)
 
@@ -167,7 +168,7 @@ def submit_summary_feedback(request, pk):
 
     messages.error(request, 'Invalid feedback provided.')
     return redirect('article_detail', pk=pk)
-from .utils import text_to_speech
+
 
 def create_audio_for_article(article):
     if article.content:
@@ -175,3 +176,28 @@ def create_audio_for_article(article):
         relative_audio_path = text_to_speech(article.content, filename)
         article.audio_file = relative_audio_path
         article.save()
+
+
+@login_required
+@require_POST
+@csrf_exempt  # Optional: remove if your JS handles CSRF properly
+def generate_audio_ajax(request, pk):
+    if request.method == "POST":
+        try:
+            article = Article.objects.get(pk=pk)
+            
+            if not article.summary:
+                return JsonResponse({'status': 'error', 'message': 'No summary available to convert to audio.'})
+            
+            audio_url = generate_audio_from_text(article)
+            return JsonResponse({'status': 'success', 'audio_url': audio_url})
+        
+        except Article.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Article not found.'})
+        
+        except Exception as e:
+            logger.error(f"Error generating audio for article {pk}: {e}", exc_info=True)
+            return JsonResponse({'status': 'error', 'message': 'Server error during audio generation.'})
+    
+    else:
+        return JsonResponse({'status': 'error', 'message': 'Invalid request method.'})

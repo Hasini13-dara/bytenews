@@ -47,6 +47,11 @@
               <p class="text-muted">Login to generate audio summary.</p>
             {% endif %}
           {% endif %}
+
+          <!-- ✅ Loading Spinner -->
+          <div id="loadingSpinner" class="spinner-border text-primary mt-3" role="status" style="display: none;">
+            <span class="visually-hidden">Loading...</span>
+          </div>
         </div>
 
         <div class="mt-2 text-muted">
@@ -124,11 +129,12 @@
   </div>
 </div>
 
-<!-- AJAX Audio Generation Script -->
+<!-- ✅ AJAX Audio Generation Script with Spinner -->
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     const generateAudioBtn = document.getElementById('generateAudioBtn');
     const audioPlayerContainer = document.getElementById('audioPlayerContainer');
+    const loadingSpinner = document.getElementById('loadingSpinner');
     const csrfToken = document.querySelector('#audioForm input[name="csrfmiddlewaretoken"]')?.value;
 
     if (generateAudioBtn && csrfToken) {
@@ -141,8 +147,11 @@
         loadingText.className = "text-muted";
         loadingText.innerHTML = "<em>Generating audio... Please wait.</em>";
 
-        audioPlayerContainer.appendChild(loadingText);
+        // ✅ Show spinner and disable button
+        loadingSpinner.style.display = "block";
         generateAudioBtn.disabled = true;
+
+        audioPlayerContainer.appendChild(loadingText);
 
         fetch(`/articles/article/${articleId}/generate_audio_ajax/`, {
           method: 'POST',
@@ -153,6 +162,9 @@
         })
         .then(response => response.json())
         .then(data => {
+          // ✅ Hide spinner
+          loadingSpinner.style.display = "none";
+
           if (data.status === 'success') {
             loadingText.textContent = 'Audio summary ready!';
 
@@ -177,6 +189,7 @@
         })
         .catch(error => {
           console.error('Fetch error:', error);
+          loadingSpinner.style.display = "none";
           loadingText.textContent = 'Failed to generate audio. Please try again.';
           generateAudioBtn.disabled = false;
         });

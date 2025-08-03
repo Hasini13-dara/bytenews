@@ -1,6 +1,7 @@
 from django.urls import path
 from .views import ArticleListView, ArticleDetailView
 from . import views
+from .views import GenerateAudioAPIView
 
 
 
@@ -13,5 +14,6 @@ urlpatterns = [
     path('article/<int:pk>/generate_summary/', views.generate_summary_view, name='generate_summary'),
     path('article/<int:pk>/feedback/', views.submit_summary_feedback, name='submit_summary_feedback'),
     path('article/<int:pk>/generate_audio_ajax/', views.generate_audio_ajax, name='generate_audio_ajax'),
+    path('api/articles/<int:pk>/generate_audio/', GenerateAudioAPIView.as_view(), name='api_generate_audio'),
 
 ]

@@ -11,6 +11,17 @@ from django.views.decorators.csrf import csrf_exempt
 
 from .models import Article, Category, UserPreference, ReadingHistory, SummaryFeedback
 from .utils import generate_summary, generate_audio_summary, text_to_speech, generate_audio_from_text
+from rest_framework import viewsets
+from .models import Article
+from .serializers import ArticleSerializer
+# news/views.py
+from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
+from .models import UserPreference
+from .serializers import UserPreferenceSerializer
+from .utils import generate_audio_summary, generate_summary
+from rest_framework.views import APIView
+
 
 logger = logging.getLogger(__name__)
 
@@ -27,14 +38,14 @@ class ArticleListView(ListView):
         query = self.request.GET.get('q')
 
         if category:
-            queryset = queryset.filter(category__name__iexact=category)
+            queryset = queryset.filter(category_name_iexact=category)
 
         if query:
             queryset = queryset.filter(
                 Q(title__icontains=query) |
                 Q(content__icontains=query) |
                 Q(summary__icontains=query) |
-                Q(category__name__icontains=query)
+                Q(category_name_icontains=query)
             ).distinct()
 
         if self.request.user.is_authenticated:
@@ -201,3 +212,62 @@ def generate_audio_ajax(request, pk):
     
     else:
         return JsonResponse({'status': 'error', 'message': 'Invalid request method.'})
+# news/views.py
+from rest_framework import viewsets
+from .models import Category
+
+class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Category.objects.all()
+
+    def get_serializer_class(self):
+        from .serializers import CategorySerializer
+        return CategorySerializer
+
+
+class ArticleViewSet(viewsets.ReadOnlyModelViewSet):  # GET-only viewset
+    queryset = Article.objects.all().order_by('-publication_date')
+    serializer_class = ArticleSerializer
+
+class UserPreferenceViewSet(viewsets.ModelViewSet):
+    queryset = UserPreference.objects.all().order_by('id')
+    serializer_class = UserPreferenceSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return UserPreference.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+# news/views.py
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from django.shortcuts import get_object_or_404
+from django.conf import settings
+from .models import Article
+from .utils import generate_audio_summary, generate_summary
+
+class GenerateAudioAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk, format=None):
+        article = get_object_or_404(Article, pk=pk)
+
+        if not article.summary:
+            article.summary = generate_summary(article.content, article.title)
+            article.save()
+            if not article.summary:
+                return Response({'detail': 'Could not generate summary for article.'},
+                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        audio_url = generate_audio_summary(article.summary, article.id)
+
+        if audio_url:
+            article.audio_file.name = audio_url.replace(settings.MEDIA_URL, '', 1)
+            article.save()
+            return Response({'audio_url': audio_url}, status=status.HTTP_200_OK)
+        else:
+            return Response({'detail': 'Failed to generate audio summary.'},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)

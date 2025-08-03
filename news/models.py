@@ -10,11 +10,8 @@ class Category(models.Model):
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
 
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        ordering = ['name']
+    def _str_(self):
+        return self.name 
 
 
 class Article(models.Model):
@@ -37,18 +34,18 @@ class Article(models.Model):
     
     approved = models.BooleanField(default=False)
 
-    def __str__(self):
+    def str(self):
         return self.title
 
     class Meta:
         ordering = ['-published_date']
 
-
 class UserPreference(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    preferred_categories = models.ManyToManyField(Category, blank=True)
+    categories = models.ManyToManyField(Category, related_name='user_pref_categories')
+    preferred_categories = models.ManyToManyField(Category, related_name='user_pref_preferred')
 
-    def __str__(self):
+    def str(self):  # ✅ Corrected
         return f"{self.user.username}'s preferences"
 
 
@@ -57,7 +54,7 @@ class ReadingHistory(models.Model):
     article = models.ForeignKey(Article, on_delete=models.CASCADE)
     read_at = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
+    def str(self):
         return f"{self.user.username} read {self.article.title}"
 
     class Meta:
@@ -74,5 +71,5 @@ class SummaryFeedback(models.Model):
         unique_together = ('user', 'article')  # One feedback per user per article
         verbose_name_plural = "Summary Feedback"
 
-    def __str__(self):
+    def str(self):
         return f"{self.user.username} - {self.article.title[:30]} - Helpful: {self.is_helpful}"

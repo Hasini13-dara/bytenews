@@ -136,3 +136,14 @@ def generate_audio_from_text(article):
 
     logger.info(f"Generated audio for article {article.pk} at {audio_path}")
     return f"{settings.MEDIA_URL}news_audio/{audio_filename}"
+def generate_audio(text, title):
+    filename = f"{title[:50].replace(' ', '_')}.mp3"
+    filepath = os.path.join(settings.MEDIA_ROOT, "audio", filename)
+
+    # Make sure the audio folder exists
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+    tts = gTTS(text)
+    tts.save(filepath)
+    
+    return f"audio/{filename}"
